@@ -1,19 +1,16 @@
-const express = require("express");
-const categoryController = require("../controllers/categoryControllers");
-const { AdminGuard } = require("../middleware/authGuard");
+const router = require("express").Router();
+const categoryController = require("../controller/categoryControllers");
 
-const router = express.Router();
-
+// create Category
 router.post("/create", categoryController.createCategory);
 
-router.get("/get_all_categorys", categoryController.getAllCategorys);
+// delete Category
+router.delete("/delete_category/:id", categoryController.deleteCategory);
 
-router.get("/get_category/:id", categoryController.getCategoryById);
+// get all caterogy
 
-router.post("/update_category/:id", categoryController.updateCategory);
+router.get("/get_all_category", categoryController.getAllCaterogy);
 
-router.post("/delete_category/:id", categoryController.deleteCategory);
-
-router.get("/pagination", categoryController.paginationCategorys);
+router.get("/getcaterogybyid/:id", categoryController.getCategoryById);
 
 module.exports = router;

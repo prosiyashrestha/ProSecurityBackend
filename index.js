@@ -1,59 +1,123 @@
-// importing the pacakages(express)
+// importing the packages. (express.)
 const express = require("express");
+// importing the packages. (mangoose.)
 const mongoose = require("mongoose");
-
+// importing the data base
 const connectDatabase = require("./database/database");
+// importing the dotenv
 const dotenv = require("dotenv");
-
+// importing cors  to link with frontend (its a policy)
 const cors = require("cors");
-const acceptFormData = require("express-fileupload");
+// importing express-fileupload
 
-// Creating an express application
+const fs = require("fs");
+const https = require("https");
+const http = require("http");
+
+const acceptFOrmData = require("express-fileupload");
+const loggerMiddleware = require("./middleware/loggerMiddleware");
+const {
+  globalLimiter,
+  authLimiter,
+  apiLimiter,
+} = require("./middleware/rateLimiter");
+// creating an express application.
 const app = express();
+app.use(express.json());
 
-//Configure cors policy
+// Logger middleware
+app.use(loggerMiddleware);
+
+// Rate limiter
+app.use(globalLimiter);
+//configure cors policy
 const corsOptions = {
   origin: true,
   credentials: true,
   optionSuccessStatus: 200,
 };
-
 app.use(cors(corsOptions));
 
-// Express JSON config
-app.use(express.json());
-
-//Config form data
-app.use(acceptFormData());
-
-//Make a static public folder
-app.use(express.static("./public"));
-
-// Connecting  to Database then create admin user if does not exist
-connectDatabase();
-
-// dotenv configuration
+//dotenv configuration
 dotenv.config();
 
-//Defining the port
+// config from data
+app.use(acceptFOrmData());
+// make static form data
+app.use(express.static("./public"));
+
+//defining the port .
 const PORT = process.env.PORT;
 
-//Making a test endpoint
-// Endpoint : POST, GET, PUT, DELETE
+//connecting to databas
+connectDatabase();
+
+//making a test endpoint.
 app.get("/test", (req, res) => {
-  res.send("Test api is working..");
+  res.status(200);
+  res.send("Hello World, test api is working.");
 });
 
-app.use("/api/user", require("./routes/userRoutes"));
-app.use("/api/categorys", require("./routes/categoryRoutes"));
-app.use("/api/venues", require("./routes/venueRoutes"));
-app.use("/api/bookings", require("./routes/bookingRoutes"));
-app.use("/api/rating-comment", require("./routes/ratingCommentRoute"));
-// Configuring Routes of User
+//configuring routes
+app.use("/api/user", authLimiter, require("./routes/userRoutes"));
 
-// http://localhost5500/api/user/create
+app.use("/api", apiLimiter);
+app.use("/api/category", require("./routes/categoryRoutes"));
+app.use("/api/product", require("./routes/productRoutes"));
+app.use("/api/cart", require("./routes/cartRoutes"));
+app.use("/api/order", require("./routes/orderRoute"));
+app.use("/api/address", require("./routes/addressRoute"));
+app.use("/api/review", require("./routes/reviewRoutes"));
+// app.use('/api/review', require('./routes/reviewRoutes'))
+app.get("/api/auth/validate-token", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
 
-//Starting the server
-app.listen(PORT, () => {
-  console.log(`Server is Running on port ${PORT} !`);
+  if (!token) {
+    return res
+      .status(401)
+      .json({ success: false, message: "No token provided" });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    return res.status(200).json({ success: true, user: decoded });
+  } catch (error) {
+    return res.status(401).json({ success: false, message: "Invalid token" });
+  }
 });
+
+// // starting the server.
+// app.listen(PORT, () => {
+//   console.log(`Server - app is running on port ${PORT}`);
+// });
+
+const httpsOptions = {
+  key: fs.readFileSync(
+    "/Users/prociya/Desktop/eventcraft/event_backend/localhost+2-key.pem"
+  ),
+  cert: fs.readFileSync(
+    "/Users/prociya/Desktop/eventcraft/event_backend/localhost+2.pem"
+  ),
+};
+
+// HTTPS server
+const httpsServer = https.createServer(httpsOptions, app);
+
+// HTTP to HTTPS redirect
+const httpApp = express();
+httpApp.use((req, res) => {
+  res.redirect(`https://localhost:${process.env.HTTPS_PORT}${req.url}`);
+});
+
+const httpServer = http.createServer(httpApp);
+
+// Ports
+const HTTPS_PORT = process.env.HTTPS_PORT || 443;
+// const HTTP_PORT = process.env.PORT || 80;
+
+// Start servers
+httpsServer.listen(HTTPS_PORT, () => {
+  console.log(`Server - app is running on port ${HTTPS_PORT}`);
+});
+
+module.exports = app;
